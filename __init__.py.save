@@ -1,0 +1,37 @@
+"""
+Trading bot widgets for ShellAgent.
+"""
+
+# Define empty imports to avoid errors during ShellAgent startup
+# The actual widget classes will be loaded when they're used
+PineScriptExecutor = None
+ConfigurationManager = None
+BacktestReportGenerator = None
+StrategyLibrary = None
+
+# Try to load widgets but suppress errors
+def _load_widgets():
+    global PineScriptExecutor, ConfigurationManager, BacktestReportGenerator, StrategyLibrary
+    try:
+        from .pine_script_executor import PineScriptExecutor
+    except ImportError:
+        pass
+    
+    try:
+        from .configuration_manager import ConfigurationManager
+    except ImportError:
+        pass
+    
+    try:
+        from .backtest_report_generator import BacktestReportGenerator
+    except ImportError:
+        pass
+    
+    try:
+        from .strategy_library import StrategyLibrary
+    except ImportError:
+        pass
+
+# Load widgets when the module is imported
+_load_widgets()
+
