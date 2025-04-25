@@ -65,10 +65,21 @@ class BacktestReportGenerator(BaseWidget):
                     "download_url": ""
                 }
                 
-            # Create a download URL (in a real implementation, this might involve
-            # saving to a publicly accessible location or using a specific endpoint)
-            # For now, we'll use a placeholder
-            download_url = f"file://{report_path}"
+            # Build data-URL so the user can directly click and download without any server.
+            mime_map = {
+                "html": "text/html;charset=utf-8",
+                "json": "application/json;charset=utf-8",
+                "csv": "text/csv;charset=utf-8",
+            }
+            mime = mime_map.get(report_format, "text/plain;charset=utf-8")
+            # Encode report data to base64 so browsers treat it as downloadable file
+            if isinstance(report_data, str):
+                encoded = base64.b64encode(report_data.encode("utf-8")).decode("utf-8")
+            else:
+                encoded = base64.b64encode(report_data).decode("utf-8")
+
+            # Provide filename hint via URL fragment for mobile/desktop browsers
+            download_url = f"data:{mime};base64,{encoded}#filename={os.path.basename(report_path)}"
             
             return {
                 "status": "success",
