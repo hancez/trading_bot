@@ -14,7 +14,8 @@ class BacktestReportGenerator(BaseWidget):
     NAME = "Backtest Report Generator"
     
     class InputsSchema(BaseWidget.InputsSchema):
-        backtest_results: Dict[str, Any] = Field({}, description="Backtest results to include in the report")
+        backtest_results: Dict[str, Any] = Field({}, description="Backtest results to include in the report (object mode)")
+        backtest_results_json: str = Field("", description="Backtest results as JSON string (use Ref Mode)")
         strategy_name: str = Field("", description="Name of the strategy")
         format: str = Field("html", description="Output format (html, json, csv)")
         include_charts: bool = Field(True, description="Whether to include charts in the report")
@@ -30,7 +31,7 @@ class BacktestReportGenerator(BaseWidget):
     def execute(self, environ, config):
         try:
             # Extract parameters
-            backtest_results = config.backtest_results
+            backtest_results = config.backtest_results or json.loads(config.backtest_results_json) if config.backtest_results_json else {}
             strategy_name = config.strategy_name
             report_format = config.format.lower()
             include_charts = config.include_charts
