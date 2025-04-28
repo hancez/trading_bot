@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from pydantic import Field
 import base64
 
@@ -15,7 +15,7 @@ class BacktestReportGenerator(BaseWidget):
     
     class InputsSchema(BaseWidget.InputsSchema):
         backtest_results: Dict[str, Any] = Field({}, description="Backtest results to include in the report (object mode)")
-        backtest_results_json: str = Field("", description="Backtest results as JSON string (use Ref Mode)")
+        backtest_results_json: Union[str, Dict[str, Any]] = Field("", description="Backtest results as JSON string or object (legacy)")
         strategy_name: str = Field("", description="Name of the strategy")
         format: str = Field("html", description="Output format (html, json, csv)")
         include_charts: bool = Field(True, description="Whether to include charts in the report")
@@ -31,7 +31,16 @@ class BacktestReportGenerator(BaseWidget):
     def execute(self, environ, config):
         try:
             # Extract parameters
-            backtest_results = config.backtest_results or json.loads(config.backtest_results_json) if config.backtest_results_json else {}
+            # Legacy compatibility: accept both object and JSON string
+            if config.backtest_results:
+                backtest_results = config.backtest_results
+            elif config.backtest_results_json:
+                if isinstance(config.backtest_results_json, str):
+                    backtest_results = json.loads(config.backtest_results_json)
+                else:
+                    backtest_results = config.backtest_results_json  # already a dict
+            else:
+                backtest_results = {}
             strategy_name = config.strategy_name
             report_format = config.format.lower()
             include_charts = config.include_charts
