@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
 from pydantic import Field
 import base64
+import shutil
+import pathlib
 
 from proconfig.widgets.base import WIDGETS, BaseWidget
 
@@ -75,21 +77,16 @@ class BacktestReportGenerator(BaseWidget):
                     "download_url": ""
                 }
                 
-            # Build data-URL so the user can directly click and download without any server.
-            mime_map = {
-                "html": "text/html;charset=utf-8",
-                "json": "application/json;charset=utf-8",
-                "csv": "text/csv;charset=utf-8",
-            }
-            mime = mime_map.get(report_format, "text/plain;charset=utf-8")
-            # Encode report data to base64 so browsers treat it as downloadable file
-            if isinstance(report_data, str):
-                encoded = base64.b64encode(report_data.encode("utf-8")).decode("utf-8")
-            else:
-                encoded = base64.b64encode(report_data).decode("utf-8")
+            # If running inside ShellAgent server, expose file via /static/ path
+            static_reports_dir = pathlib.Path("data/app/reports")
+            static_reports_dir.mkdir(parents=True, exist_ok=True)
+            static_report_path = static_reports_dir / os.path.basename(report_path)
+            try:
+                shutil.copy(report_path, static_report_path)
+            except Exception:
+                pass  # ignore if copy fails
 
-            # Provide filename hint via URL fragment for mobile/desktop browsers
-            download_url = f"data:{mime};base64,{encoded}#filename={os.path.basename(report_path)}"
+            download_url = f"/static/reports/{os.path.basename(report_path)}"
             
             return {
                 "status": "success",
