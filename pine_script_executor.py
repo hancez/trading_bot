@@ -192,6 +192,12 @@ class PineScriptExecutor(BaseWidget):
         net_profit = sum(t["profit_amount"] for t in trades)
         net_profit_percent = (net_profit / initial_capital) * 100
         
+        # Determine last price for current market snapshot
+        if trades:
+            last_price = trades[-1]["exit_price"]
+        else:
+            last_price = round(base_price, 2)
+
         # Generate chart data for equity curve
         equity_curve = {"x": [], "y": []}
         current_equity = initial_capital
@@ -253,7 +259,8 @@ class PineScriptExecutor(BaseWidget):
                 "drawdown_curve": drawdown_curve,
                 "monthly_returns": monthly_returns
             },
-            "execution_mode": "simulation"
+            "execution_mode": "simulation",
+            "last_price": round(last_price, 2)
         }
 
 if __name__ == "__main__":
