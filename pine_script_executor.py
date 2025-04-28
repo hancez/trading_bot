@@ -140,7 +140,38 @@ class PineScriptExecutor(BaseWidget):
                 exit_date = end
                 
             # Generate prices
-            base_price = 1000 + random.random() * 1000
+            base_price = None
+            try:
+                import requests
+                # Very lightweight request to CoinGecko public API (no key required)
+                symbol_lower = symbol.lower()
+                if symbol_lower in ["btc", "btcusd", "btc-usd", "bitcoinusd", "btc/usd", "bitcoin/usd"]:
+                    cg_id = "bitcoin"
+                elif symbol_lower in ["eth", "ethusd", "eth-usd", "ethereumusd", "eth/usd", "ethereum/usd"]:
+                    cg_id = "ethereum"
+                else:
+                    # Try generic mapping: strip non alphabetic characters
+                    cg_id = None
+                if cg_id:
+                    resp = requests.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={"ids": cg_id, "vs_currencies": "usd"},
+                        timeout=5,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if cg_id in data and "usd" in data[cg_id]:
+                            base_price = float(data[cg_id]["usd"])
+            except Exception:
+                # Silent fail; fall back to random mock
+                pass
+
+            if base_price is None:
+                # Fallback: previous mock range (1k-2k) adjusted to larger range for BTC
+                if symbol.lower().startswith("btc"):
+                    base_price = 20000 + random.random() * 40000  # 20k-60k
+                else:
+                    base_price = 1000 + random.random() * 1000
             price_change = (random.random() - 0.3) * 10  # -3% to +7% change
             
             if side == "Long":
