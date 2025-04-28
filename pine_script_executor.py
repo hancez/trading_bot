@@ -88,6 +88,44 @@ class PineScriptExecutor(BaseWidget):
         This is a placeholder for testing the widget workflow.
         """
         
+        def _fetch_current_price(sym: str) -> Optional[float]:
+            """Return current USD price for a given crypto symbol using CoinGecko simple API."""
+            try:
+                import requests, re
+                sym_low = sym.lower()
+                # quick symbol→id mapping
+                mapping = {
+                    "btc": "bitcoin",
+                    "btcusd": "bitcoin",
+                    "btc-usd": "bitcoin",
+                    "btc/usd": "bitcoin",
+                    "eth": "ethereum",
+                    "ethusd": "ethereum",
+                    "eth-usd": "ethereum",
+                    "eth/usd": "ethereum",
+                }
+                # strip non-alpha chars for generic mapping (e.g. BTCUSDT -> btcusdt -> btc)
+                if sym_low not in mapping:
+                    pure = re.sub(r"[^a-z]", "", sym_low)
+                    if pure.endswith("usd"):
+                        pure = pure[:-3]
+                    if pure in mapping:
+                        sym_low = pure
+                cg_id = mapping.get(sym_low)
+                if not cg_id:
+                    return None
+                resp = requests.get(
+                    "https://api.coingecko.com/api/v3/simple/price",
+                    params={"ids": cg_id, "vs_currencies": "usd"},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return float(data[cg_id]["usd"])
+            except Exception:
+                pass
+            return None
+        
         # Parse the script content to extract strategy name
         strategy_name = "Unknown Strategy"
         for line in script_content.split('\n'):
@@ -98,6 +136,9 @@ class PineScriptExecutor(BaseWidget):
                     strategy_name = parts[1]
                 break
                 
+        # Fetch a baseline current price (if available)
+        current_price = _fetch_current_price(symbol) or 0
+        
         # Generate a simple simulation based on the script and parameters
         # This is not a real backtest, just a mock result for demonstration
         
@@ -139,34 +180,11 @@ class PineScriptExecutor(BaseWidget):
             if exit_date > end:
                 exit_date = end
                 
-            # Generate prices
+            # Generate prices for this trade (use current_price as baseline if available)
             base_price = None
-            try:
-                import requests
-                # Very lightweight request to CoinGecko public API (no key required)
-                symbol_lower = symbol.lower()
-                if symbol_lower in ["btc", "btcusd", "btc-usd", "bitcoinusd", "btc/usd", "bitcoin/usd"]:
-                    cg_id = "bitcoin"
-                elif symbol_lower in ["eth", "ethusd", "eth-usd", "ethereumusd", "eth/usd", "ethereum/usd"]:
-                    cg_id = "ethereum"
-                else:
-                    # Try generic mapping: strip non alphabetic characters
-                    cg_id = None
-                if cg_id:
-                    resp = requests.get(
-                        "https://api.coingecko.com/api/v3/simple/price",
-                        params={"ids": cg_id, "vs_currencies": "usd"},
-                        timeout=5,
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if cg_id in data and "usd" in data[cg_id]:
-                            base_price = float(data[cg_id]["usd"])
-            except Exception:
-                # Silent fail; fall back to random mock
-                pass
+            base_price = current_price
 
-            if base_price is None:
+            if base_price == 0:
                 # Fallback: previous mock range (1k-2k) adjusted to larger range for BTC
                 if symbol.lower().startswith("btc"):
                     base_price = 20000 + random.random() * 40000  # 20k-60k
@@ -223,11 +241,8 @@ class PineScriptExecutor(BaseWidget):
         net_profit = sum(t["profit_amount"] for t in trades)
         net_profit_percent = (net_profit / initial_capital) * 100
         
-        # Determine last price for current market snapshot
-        if trades:
-            last_price = trades[-1]["exit_price"]
-        else:
-            last_price = round(base_price, 2)
+        # Determine last price for current market snapshot. Use fetched current_price if available.
+        last_price = round(current_price if current_price else trades[-1]["exit_price"] if trades else base_price, 2)
 
         # Generate chart data for equity curve
         equity_curve = {"x": [], "y": []}
