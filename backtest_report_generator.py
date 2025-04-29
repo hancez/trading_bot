@@ -8,6 +8,9 @@ import base64
 import shutil
 import pathlib
 
+# Import central path constant for static build directory
+from servers.base import WEB_BUILD_DIR
+
 from proconfig.widgets.base import WIDGETS, BaseWidget
 
 @WIDGETS.register_module()
@@ -77,14 +80,18 @@ class BacktestReportGenerator(BaseWidget):
                     "download_url": ""
                 }
                 
-            # If running inside ShellAgent server, expose file via /static/ path
-            static_reports_dir = pathlib.Path("data/app/reports")
-            static_reports_dir.mkdir(parents=True, exist_ok=True)
-            static_report_path = static_reports_dir / os.path.basename(report_path)
-            try:
-                shutil.copy(report_path, static_report_path)
-            except Exception:
-                pass  # ignore if copy fails
+            # Ensure the generated report resides inside WEB_BUILD_DIR/reports.
+            reports_dir = pathlib.Path(WEB_BUILD_DIR) / "reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+
+            # If the generator already saved inside reports_dir we are good; otherwise copy it.
+            if not str(report_path).startswith(str(reports_dir)):
+                dest_path = reports_dir / os.path.basename(report_path)
+                try:
+                    shutil.copy(report_path, dest_path)
+                except Exception:
+                    pass
+                report_path = str(dest_path)
 
             download_url = f"/static/reports/{os.path.basename(report_path)}"
             
@@ -109,9 +116,13 @@ class BacktestReportGenerator(BaseWidget):
         """Generate an HTML report"""
         
         # Create a temporary file for the report
+        reports_dir = pathlib.Path(WEB_BUILD_DIR) / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        report_filename = f"{strategy_name.replace(' ', '_')}_{timestamp}.html"
-        report_path = os.path.join(tempfile.gettempdir(), report_filename)
+        safe_name = "".join(c if c.isalnum() else "_" for c in strategy_name)
+        report_filename = f"{safe_name}_{timestamp}.html"
+        report_path = str(reports_dir / report_filename)
         
         # Start building the HTML content
         html_content = f"""
@@ -355,9 +366,13 @@ class BacktestReportGenerator(BaseWidget):
         """Generate a JSON report"""
         
         # Create a temporary file for the report
+        reports_dir = pathlib.Path(WEB_BUILD_DIR) / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        report_filename = f"{strategy_name.replace(' ', '_')}_{timestamp}.json"
-        report_path = os.path.join(tempfile.gettempdir(), report_filename)
+        safe_name = "".join(c if c.isalnum() else "_" for c in strategy_name)
+        report_filename = f"{safe_name}_{timestamp}.json"
+        report_path = str(reports_dir / report_filename)
         
         # Copy the results and add metadata
         report_data = {
@@ -397,9 +412,13 @@ class BacktestReportGenerator(BaseWidget):
         """Generate a CSV report"""
         
         # Create a temporary file for the report
+        reports_dir = pathlib.Path(WEB_BUILD_DIR) / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        report_filename = f"{strategy_name.replace(' ', '_')}_{timestamp}.csv"
-        report_path = os.path.join(tempfile.gettempdir(), report_filename)
+        safe_name = "".join(c if c.isalnum() else "_" for c in strategy_name)
+        report_filename = f"{safe_name}_{timestamp}.csv"
+        report_path = str(reports_dir / report_filename)
         
         # Start with headers and summary
         csv_content = f"# Backtest Report: {strategy_name}\n"
