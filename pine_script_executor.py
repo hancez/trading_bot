@@ -1,6 +1,7 @@
 import os
 import json
 import tempfile
+import re  # Added import
 from typing import Dict, Any, List, Optional
 from pydantic import Field
 
@@ -22,6 +23,7 @@ class PineScriptExecutor(BaseWidget):
         position_size: float = Field(100.0, description="Position size in percent of capital")
         commission_percent: float = Field(0.1, description="Commission percent per trade")
         simulation_mode: bool = Field(True, description="Run in simulation mode without TradingView API")
+        config_json: str = Field("", description="Optional JSON config to override script inputs")
         
     class OutputsSchema(BaseWidget.OutputsSchema):
         status: str
@@ -46,6 +48,22 @@ class PineScriptExecutor(BaseWidget):
                     "backtest_results": {}
                 }
                 
+            # Parse JSON config and apply it
+            cfg = {}
+            if config.config_json:
+                try:
+                    cfg = json.loads(config.config_json)
+                except Exception:
+                    pass # Ignore invalid JSON
+
+            # Override common parameters from config if present
+            start_date = cfg.get("回测起始日期") or cfg.get("开始日期") or config.start_date
+            end_date   = cfg.get("回测结束日期") or cfg.get("结束日期") or config.end_date
+            
+            # Apply other config values directly to the script content
+            if cfg:
+                script_content = self._apply_config(script_content, cfg)
+
             # Check if we're in simulation mode
             if config.simulation_mode:
                 # In simulation mode, we'll generate a mock backtest result
@@ -53,8 +71,8 @@ class PineScriptExecutor(BaseWidget):
                     script_content=script_content,
                     symbol=config.symbol,
                     timeframe=config.timeframe,
-                    start_date=config.start_date,
-                    end_date=config.end_date,
+                    start_date=start_date[:10] if start_date else "", # Use potentially overridden date
+                    end_date=end_date[:10] if end_date else "",       # Use potentially overridden date
                     initial_capital=config.initial_capital,
                     position_size=config.position_size,
                     commission_percent=config.commission_percent
@@ -81,6 +99,29 @@ class PineScriptExecutor(BaseWidget):
                 "backtest_results": {}
             }
             
+    def _apply_config(self, script: str, cfg: dict) -> str:
+        """Applies config values to the Pine script content using regex substitution."""
+        mapping = {
+            # 策略1 specific keys
+            r"(benchmarkSymbol\\s*=\\s*input\\.symbol\\()\\s*[^,)]*": ("对标标的", '"{}"'),
+            r"(ma_length1\\s*=\\s*input\\.int\\()\\s*[^,)]*": ("MAX1长度", '{}'),
+            r"(ma_length2\\s*=\\s*input\\.int\\()\\s*[^,)]*": ("MAX2长度", '{}'),
+            r"(threshold\\s*=\\s*input\\.float\\()\\s*[^,)]*": ("突破门槛(%)", '{} / 100'),
+            # 策略2 specific keys
+            r"(ma120_length\\s*=\\s*input\\.int\\()\\s*[^,)]*": ("MA120Length", '{}'),
+            r"(adx_length\\s*=\\s*input\\.int\\()\\s*[^,)]*": ("ADXLength", '{}'),
+            r"(adx_smoothing\\s*=\\s*input\\.int\\()\\s*[^,)]*": ("ADX平滑", '{}'),
+            r"(threshold\\s*=\\s*input\\.float\\()\\s*[^,)]*": ("Threshold(%)", '{} / 100'),
+            r"(adxhlin\\s*=\\s*input\\.int\\()\\s*[^,)]*": ("Adx阈值", '{}'),
+            # Note: start/end dates are handled separately in execute method
+        }
+        for pattern, (cfg_key, fmt) in mapping.items():
+            if cfg_key in cfg:
+                value = fmt.format(cfg[cfg_key])
+                # Substitute the first argument in the input function call
+                script = re.sub(pattern, rf"\\1{value}", script, count=1)
+        return script
+
     def _simulate_backtest(self, script_content, symbol, timeframe, start_date, end_date, 
                          initial_capital, position_size, commission_percent):
         """
