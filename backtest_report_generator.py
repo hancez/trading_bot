@@ -44,7 +44,7 @@ class BacktestReportGenerator(BaseWidget):
     
     class InputsSchema(BaseWidget.InputsSchema):
         backtest_results: Dict[str, Any] = Input({}, description="Backtest results to include in the report (object mode)", type="object")
-        backtest_results_json: str = Input("", description="Backtest results as JSON string (legacy)", type="string")
+        backtest_results_json: Dict[str, Any] = Input({}, description="Backtest results as JSON string or object (legacy)", type="object")
         strategy_name: str = Input("", description="Name of the strategy", type="string")
         format: str = Input("html", description="Output format (html, json, csv)", type="string")
         include_charts: bool = Input(True, description="Whether to include charts in the report", type="boolean")
