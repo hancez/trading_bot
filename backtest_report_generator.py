@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from pydantic import Field
 import base64
 import shutil
@@ -13,25 +13,49 @@ from servers.base import WEB_BUILD_DIR
 
 from proconfig.widgets.base import WIDGETS, BaseWidget
 
+# ------------------------ helper wrappers (module-level) ------------------------
+def Input(*args, **kwargs):
+    if "type" not in kwargs:
+        default_val = args[0] if args else None
+        if isinstance(default_val, bool):
+            kwargs["type"] = "boolean"
+        elif isinstance(default_val, int):
+            kwargs["type"] = "integer"
+        elif isinstance(default_val, float):
+            kwargs["type"] = "number"
+        elif isinstance(default_val, (list, tuple)):
+            kwargs["type"] = "array"
+        elif isinstance(default_val, dict):
+            kwargs["type"] = "object"
+        else:
+            kwargs["type"] = "string"
+    return Field(*args, **kwargs)
+
+
+def Output(*args, **kwargs):
+    return Input(*args, **kwargs)
+
+# ------------------------------------------------------------------------------
+
 @WIDGETS.register_module()
 class BacktestReportGenerator(BaseWidget):
     CATEGORY = "Custom Widgets/Trading Bot"
     NAME = "Backtest Report Generator"
     
     class InputsSchema(BaseWidget.InputsSchema):
-        backtest_results: Dict[str, Any] = Field({}, description="Backtest results to include in the report (object mode)")
-        backtest_results_json: Union[str, Dict[str, Any]] = Field("", description="Backtest results as JSON string or object (legacy)")
-        strategy_name: str = Field("", description="Name of the strategy")
-        format: str = Field("html", description="Output format (html, json, csv)")
-        include_charts: bool = Field(True, description="Whether to include charts in the report")
-        include_trades: bool = Field(True, description="Whether to include individual trades in the report")
+        backtest_results: Dict[str, Any] = Input({}, description="Backtest results to include in the report (object mode)", type="object")
+        backtest_results_json: str = Input("", description="Backtest results as JSON string (legacy)", type="string")
+        strategy_name: str = Input("", description="Name of the strategy", type="string")
+        format: str = Input("html", description="Output format (html, json, csv)", type="string")
+        include_charts: bool = Input(True, description="Whether to include charts in the report", type="boolean")
+        include_trades: bool = Input(True, description="Whether to include individual trades in the report", type="boolean")
         
     class OutputsSchema(BaseWidget.OutputsSchema):
-        status: str
-        message: str
-        report_path: str
-        report_data: str
-        download_url: str
+        status: str = Output("", description="Execution status", type="string")
+        message: str = Output("", description="Human-readable message", type="string")
+        report_path: str = Output("", description="Absolute path of generated report", type="string")
+        report_data: str = Output("", description="Report content (may be base64 or HTML)", type="string")
+        download_url: str = Output("", description="Relative URL for downloading report", type="string")
         
     def execute(self, environ, config):
         try:

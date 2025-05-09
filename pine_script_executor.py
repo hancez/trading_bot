@@ -7,28 +7,52 @@ from pydantic import Field
 
 from proconfig.widgets.base import WIDGETS, BaseWidget
 
+# ------------------------ helper wrappers (module-level) ------------------------
+def Input(*args, **kwargs):
+    if "type" not in kwargs:
+        default_val = args[0] if args else None
+        if isinstance(default_val, bool):
+            kwargs["type"] = "boolean"
+        elif isinstance(default_val, int):
+            kwargs["type"] = "integer"
+        elif isinstance(default_val, float):
+            kwargs["type"] = "number"
+        elif isinstance(default_val, (list, tuple)):
+            kwargs["type"] = "array"
+        elif isinstance(default_val, dict):
+            kwargs["type"] = "object"
+        else:
+            kwargs["type"] = "string"
+    return Field(*args, **kwargs)
+
+
+def Output(*args, **kwargs):
+    return Input(*args, **kwargs)
+
+# ------------------------------------------------------------------------------
+
 @WIDGETS.register_module()
 class PineScriptExecutor(BaseWidget):
     CATEGORY = "Custom Widgets/Trading Bot"
     NAME = "Pine Script Executor"
     
     class InputsSchema(BaseWidget.InputsSchema):
-        script_content: str = Field("", description="Direct Pine script content (preferred for cloud deployment)")
-        script_path: str = Field("", description="Path to the Pine script file (local file system only)")
-        symbol: str = Field("BTCUSD", description="Symbol to backtest on")
-        timeframe: str = Field("1D", description="Timeframe to backtest on")
-        start_date: str = Field("2020-01-01", description="Start date for backtest")
-        end_date: str = Field("", description="End date for backtest (leave empty for now)")
-        initial_capital: float = Field(10000.0, description="Initial capital for backtest")
-        position_size: float = Field(100.0, description="Position size in percent of capital")
-        commission_percent: float = Field(0.1, description="Commission percent per trade")
-        simulation_mode: bool = Field(True, description="Run in simulation mode without TradingView API")
-        config_json: str = Field("", description="Optional JSON config to override script inputs")
+        script_content: str = Input("", description="Direct Pine script content (preferred for cloud deployment)", type="string")
+        script_path: str = Input("", description="Path to the Pine script file (local file system only)", type="string")
+        symbol: str = Input("BTCUSD", description="Symbol to backtest on", type="string")
+        timeframe: str = Input("1D", description="Timeframe to backtest on", type="string")
+        start_date: str = Input("2020-01-01", description="Start date for backtest", type="string")
+        end_date: str = Input("", description="End date for backtest (leave empty for now)", type="string")
+        initial_capital: float = Input(10000.0, description="Initial capital for backtest", type="number")
+        position_size: float = Input(100.0, description="Position size in percent of capital", type="number")
+        commission_percent: float = Input(0.1, description="Commission percent per trade", type="number")
+        simulation_mode: bool = Input(True, description="Run in simulation mode without TradingView API", type="boolean")
+        config_json: str = Input("", description="Optional JSON config to override script inputs", type="string")
         
     class OutputsSchema(BaseWidget.OutputsSchema):
-        status: str
-        message: str
-        backtest_results: Dict[str, Any]
+        status: str = Output("", description="Execution status", type="string")
+        message: str = Output("", description="Human-readable message", type="string")
+        backtest_results: Dict[str, Any] = Output({}, description="Backtest result object", type="object")
         
     def execute(self, environ, config):
         try:

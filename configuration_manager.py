@@ -5,22 +5,46 @@ from pydantic import Field
 
 from proconfig.widgets.base import WIDGETS, BaseWidget
 
+# ------------------------ helper wrappers (module-level)
+def Input(*args, **kwargs):
+    if "type" not in kwargs:
+        default_val = args[0] if args else None
+        if isinstance(default_val, bool):
+            kwargs["type"] = "boolean"
+        elif isinstance(default_val, int):
+            kwargs["type"] = "integer"
+        elif isinstance(default_val, float):
+            kwargs["type"] = "number"
+        elif isinstance(default_val, (list, tuple)):
+            kwargs["type"] = "array"
+        elif isinstance(default_val, dict):
+            kwargs["type"] = "object"
+        else:
+            kwargs["type"] = "string"
+    return Field(*args, **kwargs)
+
+
+def Output(*args, **kwargs):
+    return Input(*args, **kwargs)
+
+# ------------------------------------------------------------------------------
+
 @WIDGETS.register_module()
 class ConfigurationManager(BaseWidget):
     CATEGORY = "Custom Widgets/Trading Bot"
     NAME = "Configuration Manager"
     
     class InputsSchema(BaseWidget.InputsSchema):
-        action: str = Field("load", description="Action to perform (load, save, update)")
-        config_content: str = Field("{}", description="Direct JSON configuration content (preferred for cloud deployment)")
-        config_path: str = Field("", description="Path to the configuration file (local file system only)")
-        strategy_name: str = Field("", description="Name of the strategy")
-        config_data: str = Field("{}", description="JSON configuration data (for save/update)")
+        action: str = Input("load", description="Action to perform (load, save, update)", type="string")
+        config_content: str = Input("{}", description="Direct JSON configuration content (preferred for cloud deployment)", type="string")
+        config_path: str = Input("", description="Path to the configuration file (local file system only)", type="string")
+        strategy_name: str = Input("", description="Name of the strategy", type="string")
+        config_data: str = Input("{}", description="JSON configuration data (for save/update)", type="string")
         
     class OutputsSchema(BaseWidget.OutputsSchema):
-        status: str
-        message: str
-        config_data: Dict[str, Any]
+        status: str = Output("", description="Execution status", type="string")
+        message: str = Output("", description="Human-readable message", type="string")
+        config_data: Dict[str, Any] = Output({}, description="Configuration data", type="object")
         
     def execute(self, environ, config):
         try:

@@ -7,26 +7,52 @@ import base64
 
 from proconfig.widgets.base import WIDGETS, BaseWidget
 
+# ------------------------ helper wrappers (module-level)
+def Input(*args, **kwargs):
+    if "type" not in kwargs:
+        default_val = args[0] if args else None
+        if isinstance(default_val, bool):
+            kwargs["type"] = "boolean"
+        elif isinstance(default_val, int):
+            kwargs["type"] = "integer"
+        elif isinstance(default_val, float):
+            kwargs["type"] = "number"
+        elif isinstance(default_val, (list, tuple)):
+            kwargs["type"] = "array"
+            if "items" not in kwargs:
+                kwargs["items"] = {"type": "string"}
+        elif isinstance(default_val, dict):
+            kwargs["type"] = "object"
+        else:
+            kwargs["type"] = "string"
+    return Field(*args, **kwargs)
+
+
+def Output(*args, **kwargs):
+    return Input(*args, **kwargs)
+
+# ------------------------------------------------------------------------------
+
 @WIDGETS.register_module()
 class StrategyLibrary(BaseWidget):
     CATEGORY = "Custom Widgets/Trading Bot"
     NAME = "Strategy Library"
     
     class InputsSchema(BaseWidget.InputsSchema):
-        action: str = Field("list", description="Action to perform (list, get, add, update, delete)")
-        strategy_id: str = Field("", description="ID of the strategy (for get, update, delete)")
-        strategy_name: str = Field("", description="Name of the strategy (for add)")
-        script_content: str = Field("", description="Direct Pine script content (preferred for cloud deployment)")
-        script_path: str = Field("", description="Path to the Pine script file (local file system only)")
-        config_content: str = Field("", description="Direct JSON configuration content (preferred for cloud deployment)")
-        config_path: str = Field("", description="Path to configuration file (local file system only)")
-        tags: List[str] = Field([], description="Tags/categories for the strategy (for add/update)")
+        action: str = Input("list", description="Action to perform (list, get, add, update, delete)", type="string")
+        strategy_id: str = Input("", description="ID of the strategy (for get, update, delete)", type="string")
+        strategy_name: str = Input("", description="Name of the strategy (for add)", type="string")
+        script_content: str = Input("", description="Direct Pine script content (preferred for cloud deployment)", type="string")
+        script_path: str = Input("", description="Path to the Pine script file (local file system only)", type="string")
+        config_content: str = Input("", description="Direct JSON configuration content (preferred for cloud deployment)", type="string")
+        config_path: str = Input("", description="Path to configuration file (local file system only)", type="string")
+        tags: List[str] = Input([], description="Tags/categories for the strategy (for add/update)", type="array", items={"type": "string"})
         
     class OutputsSchema(BaseWidget.OutputsSchema):
-        status: str
-        message: str
-        strategies: List[Dict[str, Any]]
-        selected_strategy: Dict[str, Any]
+        status: str = Output("", description="Execution status", type="string")
+        message: str = Output("", description="Human-readable message", type="string")
+        strategies: List[Dict[str, Any]] = Output([], description="List of strategies", type="array", items={"type": "object"})
+        selected_strategy: Dict[str, Any] = Output({}, description="Selected strategy full detail", type="object")
         
     def execute(self, environ, config):
         try:
