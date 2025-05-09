@@ -52,6 +52,8 @@ class PineScriptExecutor(BaseWidget):
     class OutputsSchema(BaseWidget.OutputsSchema):
         status: str = Output("", description="Execution status", type="string")
         message: str = Output("", description="Human-readable message", type="string")
+        last_price: float = Output(0.0, description="Latest market price used for simulation", type="number")
+        price_unavailable: bool = Output(False, description="Flag indicating if real-time price could not be fetched", type="boolean")
         backtest_results: Dict[str, Any] = Output({}, description="Backtest result object", type="object")
         
     def execute(self, environ, config):
@@ -69,6 +71,8 @@ class PineScriptExecutor(BaseWidget):
                 return {
                     "status": "error",
                     "message": "No valid Pine script provided. Please provide either a script_path or script_content.",
+                    "last_price": 0,
+                    "price_unavailable": True,
                     "backtest_results": {}
                 }
                 
@@ -105,6 +109,8 @@ class PineScriptExecutor(BaseWidget):
                 return {
                     "status": "success",
                     "message": f"Executed Pine script in simulation mode for {config.symbol} on {config.timeframe} timeframe",
+                    "last_price": backtest_results.get("last_price", 0),
+                    "price_unavailable": backtest_results.get("price_unavailable", False),
                     "backtest_results": backtest_results
                 }
             else:
@@ -113,6 +119,8 @@ class PineScriptExecutor(BaseWidget):
                 return {
                     "status": "error",
                     "message": "Real TradingView API execution is not implemented yet",
+                    "last_price": 0,
+                    "price_unavailable": True,
                     "backtest_results": {}
                 }
                 
@@ -120,6 +128,8 @@ class PineScriptExecutor(BaseWidget):
             return {
                 "status": "error",
                 "message": f"Failed to execute Pine script: {str(e)}",
+                "last_price": 0,
+                "price_unavailable": True,
                 "backtest_results": {}
             }
             
@@ -187,6 +197,16 @@ class PineScriptExecutor(BaseWidget):
                 if resp.status_code == 200:
                     data = resp.json()
                     return float(data[cg_id]["usd"])
+            except Exception:
+                pass
+
+            # Fallback to CoinDesk API if CoinGecko fails
+            try:
+                if sym.lower().startswith("btc"):
+                    import requests as _rq
+                    resp = _rq.get("https://api.coindesk.com/v1/bpi/currentprice/USD.json", timeout=5)
+                    if resp.status_code == 200:
+                        return float(resp.json()["bpi"]["USD"]["rate_float"])
             except Exception:
                 pass
             return None
