@@ -88,9 +88,16 @@ class PineScriptExecutor(BaseWidget):
             start_date = cfg.get("回测起始日期") or cfg.get("开始日期") or config.start_date
             end_date   = cfg.get("回测结束日期") or cfg.get("结束日期") or config.end_date
             
-            # Apply other config values directly to the script content
+            # Apply other config values directly to the script content (best-effort)
             if cfg:
-                script_content = self._apply_config(script_content, cfg)
+                try:
+                    script_content = self._apply_config(script_content, cfg)
+                except Exception as apply_err:
+                    # Log and fall back to original script if substitution fails
+                    import logging, traceback
+                    logging.warning("[PineScriptExecutor] _apply_config failed: %s", apply_err)
+                    logging.debug(traceback.format_exc())
+                    # continue with original script_content
 
             # Check if we're in simulation mode
             if config.simulation_mode:
